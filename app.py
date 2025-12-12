@@ -45,15 +45,15 @@ class LessonContent:
 
 def clean_json(text):
     text = text.strip()
-    start = text.find('{')
-    end = text.rfind('}') + 1
-    if start != -1 and end != -1:
-        return text[start:end]
+    if text.startswith("```json"):
+        text = text.replace("```json", "").replace("```", "")
+    elif text.startswith("```"):
+        text = text.replace("```", "")
     return text
 
 def generate_lesson(grammar, topic, language, level):
-    # Usiamo gemini-pro che è stabile
-    model = genai.GenerativeModel('gemini-pro')
+    # Con la libreria aggiornata (0.8.0+), questo modello ORA FUNZIONERÀ
+    model = genai.GenerativeModel('gemini-1.5-flash')
     
     prompt = f"""
     Sei un docente di lingue. Crea una lezione strutturata.
@@ -110,7 +110,7 @@ def generate_lesson(grammar, topic, language, level):
         return None
 
 def analyze_response(user_text, task, language):
-    model = genai.GenerativeModel('gemini-pro')
+    model = genai.GenerativeModel('gemini-1.5-flash')
     prompt = f"Sei un tutor. Compito in {language}: '{task}'. Studente: '{user_text}'. Dai feedback breve: correzione e consiglio."
     try:
         return model.generate_content(prompt).text
@@ -126,8 +126,7 @@ if 'quiz_submitted' not in st.session_state: st.session_state.quiz_submitted = F
 if st.session_state.lesson is None:
     c1, c2 = st.columns(2)
     with c1:
-        # ECCO L'ITALIANO AGGIUNTO QUI SOTTO
-        lang = st.selectbox("Lingua", ["Inglese", "Spagnolo", "Francese", "Tedesco", "Italiano"])
+        lang = st.selectbox("Lingua", ["Italiano", "Inglese", "Spagnolo", "Francese", "Tedesco"])
         level = st.select_slider("Livello", ["A1", "A2", "B1", "B2", "C1"])
     with c2:
         grammar = st.text_input("Grammatica", placeholder="es. Passato Prossimo")
