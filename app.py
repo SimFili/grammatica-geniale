@@ -12,7 +12,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# --- STILI CSS CUSTOM (Per renderla bella come la versione React) ---
+# --- STILI CSS CUSTOM ---
 st.markdown("""
     <style>
     .main-header {
@@ -49,7 +49,6 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # --- CONFIGURAZIONE API ---
-# Cerchiamo la chiave nei secrets di Streamlit (per il cloud) o input manuale
 api_key = st.secrets.get("GOOGLE_API_KEY")
 
 if not api_key:
@@ -77,13 +76,14 @@ class LessonContent:
     creativeActivity: str
     quiz: List[QuizQuestion]
 
-# --- FUNZIONI AI (IL CERVELLO) ---
+# --- FUNZIONI AI ---
 
 def generate_lesson(grammar, topic, language, level):
-    model = genai.GenerativeModel('gemini-pro')
+    # CORREZIONE: Usiamo il modello Flash, più stabile e veloce per l'API gratuita
+    model = genai.GenerativeModel('gemini-1.5-flash')
     
     prompt = f"""
-    Agisci come un docente di lingue esperto e coinvolgente.
+    Agisci come un docente di lingue esperto.
     Crea una lezione di lingua personalizzata.
     
     Target:
@@ -92,44 +92,48 @@ def generate_lesson(grammar, topic, language, level):
     - Argomento Grammaticale: {grammar}
     - Interesse dello studente (Tema): {topic}
     
-    Output richiesto (tutto in formato JSON valido):
+    Output richiesto (tutto in formato JSON valido, SENZA markdown ```json):
     {{
-        "title": "Titolo accattivante che unisce grammatica e tema",
+        "title": "Titolo accattivante",
         "theme": "{topic}",
         "grammarFocus": "{grammar}",
-        "introduction": "Spiegazione chiara della regola grammaticale usando metafore legate al tema '{topic}'. (Max 100 parole)",
-        "examples": ["3 frasi di esempio nella lingua target che usano la regola e parlano del tema"],
-        "creativeActivity": "Un prompt per un esercizio di scrittura creativa breve. (es: 'Scrivi 3 righe su...')",
+        "introduction": "Spiegazione regola (max 100 parole)",
+        "examples": ["Frase 1", "Frase 2", "Frase 3"],
+        "creativeActivity": "Prompt esercizio scrittura",
         "quiz": [
             {{
-                "question": "Domanda a scelta multipla sulla regola",
-                "options": ["Opzione A", "Opzione B", "Opzione C"],
-                "correctAnswer": "L'opzione corretta esatta",
-                "explanation": "Spiegazione breve del perché è corretta"
+                "question": "Domanda 1",
+                "options": ["A", "B", "C"],
+                "correctAnswer": "Opzione corretta esatta",
+                "explanation": "Spiegazione"
             }},
             {{
-                "question": "Altra domanda...",
-                "options": ["..."],
-                "correctAnswer": "...",
-                "explanation": "..."
+                "question": "Domanda 2",
+                "options": ["A", "B", "C"],
+                "correctAnswer": "Opzione corretta esatta",
+                "explanation": "Spiegazione"
             }},
              {{
-                "question": "Terza domanda...",
-                "options": ["..."],
-                "correctAnswer": "...",
-                "explanation": "..."
+                "question": "Domanda 3",
+                "options": ["A", "B", "C"],
+                "correctAnswer": "Opzione corretta esatta",
+                "explanation": "Spiegazione"
             }}
         ]
     }}
-    Rispondi SOLO con il JSON.
     """
     
     try:
         response = model.generate_content(prompt)
-        text_response = response.text.replace("```json", "").replace("```", "")
+        # Pulizia extra nel caso l'AI metta comunque i backticks
+        text_response = response.text.strip()
+        if text_response.startswith("```json"):
+            text_response = text_response.replace("```json", "").replace("```", "")
+        elif text_response.startswith("```"):
+            text_response = text_response.replace("```", "")
+            
         data = json.loads(text_response)
         
-        # Ricostruzione oggetti
         quiz_list = [QuizQuestion(**q) for q in data['quiz']]
         return LessonContent(
             title=data['title'],
@@ -142,35 +146,41 @@ def generate_lesson(grammar, topic, language, level):
         )
     except Exception as e:
         st.error(f"Errore nella generazione: {e}")
+        st.error("Dettagli risposta AI (per debug): " + response.text if 'response' in locals() else "Nessuna risposta")
         return None
 
 def analyze_response(user_text, prompt_task, language):
-    model = genai.GenerativeModel('gemini-pro')
+    # CORREZIONE: Anche qui usiamo il modello Flash con le virgolette singole corrette
+    model = genai.GenerativeModel('gemini-1.5-flash')
+    
     prompt = f"""
-    Sei un tutor. Lo studente doveva fare questo compito in {language}: "{prompt_task}".
-    Ha scritto: "{user_text}".
+    Sei un tutor. Compito in {language}: "{prompt_task}".
+    Risposta studente: "{user_text}".
     
     Analizza brevemente:
-    1. Correzione (riscrivi la frase corretta se ci sono errori).
-    2. Spiegazione grammaticale gentile.
+    1. Correzione (se necessaria).
+    2. Spiegazione grammaticale.
     3. Incoraggiamento.
     """
-    response = model.generate_content(prompt)
-    return response.text
+    try:
+        response = model.generate_content(prompt)
+        return response.text
+    except Exception as e:
+        return f"Errore nell'analisi: {e}"
 
-# --- INTERFACCIA UTENTE (STREAMLIT) ---
+# --- INTERFACCIA STREAMLIT ---
 
-# Header
 st.markdown("<div class='main-header'><h1>🧠 Grammatica<span class='highlight'>Geniale</span></h1><p>Il modo più smart per imparare le lingue.</p></div>", unsafe_allow_html=True)
 
 if not api_key:
-    st.stop() # Ferma tutto se non c'è la chiave
+    st.stop()
 
-# Session State per mantenere i dati tra i refresh
 if 'lesson' not in st.session_state:
     st.session_state.lesson = None
 if 'quiz_submitted' not in st.session_state:
     st.session_state.quiz_submitted = False
+if 'lang' not in st.session_state:
+    st.session_state.lang = "Italiano"
 
 # --- SEZIONE INPUT ---
 if st.session_state.lesson is None:
@@ -182,8 +192,8 @@ if st.session_state.lesson is None:
         level = st.select_slider("Il tuo livello", options=["A1", "A2", "B1", "B2", "C1"])
     
     with col2:
-        grammar = st.text_input("Argomento Grammaticale", placeholder="es. Past Simple, Congiuntivo, Verbi Modali...")
-        topic = st.text_input("Le tue passioni (Il tema)", placeholder="es. Calcio, Cucina, Harry Potter, Viaggi...")
+        grammar = st.text_input("Argomento Grammaticale", placeholder="es. Past Simple, Congiuntivo...")
+        topic = st.text_input("Le tue passioni (Il tema)", placeholder="es. Calcio, Cucina, Viaggi...")
 
     if st.button("✨ Genera Lezione Personalizzata", type="primary"):
         if grammar and topic:
@@ -191,7 +201,7 @@ if st.session_state.lesson is None:
                 lesson_data = generate_lesson(grammar, topic, lang, level)
                 if lesson_data:
                     st.session_state.lesson = lesson_data
-                    st.session_state.lang = lang # Salviamo la lingua per dopo
+                    st.session_state.lang = lang
                     st.rerun()
         else:
             st.warning("Inserisci sia la grammatica che un argomento!")
@@ -200,27 +210,22 @@ if st.session_state.lesson is None:
 else:
     lesson = st.session_state.lesson
     
-    # Pulsante Reset
     if st.button("🔄 Nuova Lezione"):
         st.session_state.lesson = None
         st.session_state.quiz_submitted = False
         st.rerun()
 
     st.markdown("---")
-    
-    # Hero Section
     st.markdown(f"## {lesson.title}")
-    st.info(f"**Concetto Chiave:** {lesson.grammarFocus} applicato al mondo di: {lesson.theme}")
+    st.info(f"**Focus:** {lesson.grammarFocus} | **Tema:** {lesson.theme}")
     st.write(lesson.introduction)
     
-    # Esempi
-    st.markdown("### 📖 Esempi nel contesto")
+    st.markdown("### 📖 Esempi")
     for i, ex in enumerate(lesson.examples):
         st.markdown(f"> **{i+1}.** *{ex}*")
     
     st.markdown("---")
 
-    # Attività Creativa
     st.markdown("### ✍️ Attività Creativa")
     st.markdown(f"**Task:** {lesson.creativeActivity}")
     user_input = st.text_area("Scrivi qui la tua risposta...", height=100)
@@ -236,42 +241,29 @@ else:
 
     st.markdown("---")
 
-    # Quiz
     st.markdown("### 🧠 Quiz Finale")
-    
     score = 0
     with st.form("quiz_form"):
         user_answers = {}
         for i, q in enumerate(lesson.quiz):
             st.markdown(f"**{i+1}. {q.question}**")
-            user_answers[i] = st.radio(f"Opzioni per domanda {i+1}", q.options, key=f"q_{i}", label_visibility="collapsed")
-            st.write("") # Spaziatura
+            user_answers[i] = st.radio(f"Scegli:", q.options, key=f"q_{i}", label_visibility="collapsed")
+            st.write("")
             
         submitted = st.form_submit_button("Controlla Risposte")
-        
         if submitted:
             st.session_state.quiz_submitted = True
 
-    # Risultati Quiz
     if st.session_state.quiz_submitted:
         st.markdown("### Risultati")
         correct_count = 0
         for i, q in enumerate(lesson.quiz):
             user_choice = user_answers.get(i)
             if user_choice == q.correctAnswer:
-                st.markdown(f"✅ **Domanda {i+1}:** Corretto!")
+                st.success(f"✅ Domanda {i+1}: Corretto!")
                 correct_count += 1
             else:
-                st.markdown(f"❌ **Domanda {i+1}:** Errato. La risposta giusta era: *{q.correctAnswer}*")
+                st.error(f"❌ Domanda {i+1}: Errato. Risposta: {q.correctAnswer}")
                 st.caption(f"Spiegazione: {q.explanation}")
         
-        final_score = (correct_count / len(lesson.quiz)) * 100
-        if final_score == 100:
-            st.balloons()
-            st.success(f"Punteggio perfetto! {correct_count}/{len(lesson.quiz)}")
-        else:
-
-            st.info(f"Punteggio finale: {correct_count}/{len(lesson.quiz)}")
-
-
-
+        st.info(f"Punteggio finale: {correct_count}/{len(lesson.quiz)}")
