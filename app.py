@@ -43,17 +43,27 @@ class LessonContent:
 
 # --- FUNZIONI AI ---
 
-def clean_json(text):
+def clean_json_response(text):
+    """Pulisce la risposta dell'AI per estrarre solo il JSON valido."""
     text = text.strip()
-    if text.startswith("```json"):
-        text = text.replace("```json", "").replace("```", "")
-    elif text.startswith("```"):
-        text = text.replace("```", "")
+    # Rimuove i blocchi markdown se presenti
+    if "```json" in text:
+        text = text.split("```json")[1].split("```")[0]
+    elif "```" in text:
+        text = text.split("```")[1].split("```")[0]
+    
+    # Cerca l'inizio e la fine dell'oggetto JSON
+    start_idx = text.find('{')
+    end_idx = text.rfind('}') + 1
+    
+    if start_idx != -1 and end_idx != -1:
+        return text[start_idx:end_idx]
     return text
 
 def generate_lesson(grammar, topic, language, level):
-    # Con la libreria aggiornata (0.8.0+), questo modello ORA FUNZIONERÀ
-    model = genai.GenerativeModel('gemini-1.5-flash')
+    # USIAMO GEMINI PRO STANDARD (NO FLASH)
+    # Questo modello è supportato da tutte le versioni della libreria.
+    model = genai.GenerativeModel('gemini-pro')
     
     prompt = f"""
     Sei un docente di lingue. Crea una lezione strutturata.
@@ -64,7 +74,7 @@ def generate_lesson(grammar, topic, language, level):
     - Grammatica: {grammar}
     - Tema: {topic}
     
-    OUTPUT: Devi rispondere SOLO con un JSON valido.
+    OUTPUT: Devi rispondere ESCLUSIVAMENTE con un JSON valido. Non aggiungere altro testo.
     Struttura JSON:
     {{
         "title": "Titolo lezione",
@@ -92,7 +102,7 @@ def generate_lesson(grammar, topic, language, level):
     
     try:
         response = model.generate_content(prompt)
-        json_str = clean_json(response.text)
+        json_str = clean_json_response(response.text)
         data = json.loads(json_str)
         
         quiz_list = [QuizQuestion(**q) for q in data['quiz']]
@@ -107,10 +117,13 @@ def generate_lesson(grammar, topic, language, level):
         )
     except Exception as e:
         st.error(f"Errore generazione: {e}")
+        # Mostra cosa ha risposto l'AI per capire l'errore (Debug)
+        if 'response' in locals():
+            st.warning(f"L'AI ha risposto questo (non JSON): {response.text}")
         return None
 
 def analyze_response(user_text, task, language):
-    model = genai.GenerativeModel('gemini-1.5-flash')
+    model = genai.GenerativeModel('gemini-pro')
     prompt = f"Sei un tutor. Compito in {language}: '{task}'. Studente: '{user_text}'. Dai feedback breve: correzione e consiglio."
     try:
         return model.generate_content(prompt).text
@@ -134,7 +147,7 @@ if st.session_state.lesson is None:
 
     if st.button("Genera Lezione", type="primary"):
         if grammar and topic:
-            with st.spinner("Creo la lezione..."):
+            with st.spinner("Creo la lezione (Modello Pro)..."):
                 res = generate_lesson(grammar, topic, lang, level)
                 if res:
                     st.session_state.lesson = res
