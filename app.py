@@ -145,7 +145,7 @@ def generate_lesson(grammar, topic, language, level):
         return None
 
 def analyze_response(user_text, prompt_task, language):
-    model = genai.GenerativeModel('gemini-1.5-flash')
+    model = genai.GenerativeModel(''gemini-pro'')
     prompt = f"""
     Sei un tutor. Lo studente doveva fare questo compito in {language}: "{prompt_task}".
     Ha scritto: "{user_text}".
@@ -272,3 +272,4 @@ else:
         else:
 
             st.info(f"Punteggio finale: {correct_count}/{len(lesson.quiz)}")
+
