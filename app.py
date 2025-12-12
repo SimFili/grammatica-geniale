@@ -80,7 +80,7 @@ class LessonContent:
 # --- FUNZIONI AI (IL CERVELLO) ---
 
 def generate_lesson(grammar, topic, language, level):
-    model = genai.GenerativeModel(''gemini-pro'')
+    model = genai.GenerativeModel('gemini-pro')
     
     prompt = f"""
     Agisci come un docente di lingue esperto e coinvolgente.
@@ -272,4 +272,5 @@ else:
         else:
 
             st.info(f"Punteggio finale: {correct_count}/{len(lesson.quiz)}")
+
 
