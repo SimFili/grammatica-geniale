@@ -44,7 +44,6 @@ class LessonContent:
 # --- FUNZIONI AI ---
 
 def clean_json(text):
-    # Pulisce la risposta dell'AI per trovare solo il JSON
     text = text.strip()
     start = text.find('{')
     end = text.rfind('}') + 1
@@ -53,14 +52,14 @@ def clean_json(text):
     return text
 
 def generate_lesson(grammar, topic, language, level):
-    # USIAMO GEMINI PRO: Il modello più stabile
+    # Usiamo gemini-pro che è stabile
     model = genai.GenerativeModel('gemini-pro')
     
     prompt = f"""
     Sei un docente di lingue. Crea una lezione strutturata.
     
     Dati:
-    - Lingua: {language}
+    - Lingua di studio: {language}
     - Livello: {level}
     - Grammatica: {grammar}
     - Tema: {topic}
@@ -112,7 +111,7 @@ def generate_lesson(grammar, topic, language, level):
 
 def analyze_response(user_text, task, language):
     model = genai.GenerativeModel('gemini-pro')
-    prompt = f"Sei un tutor. Compito in {language}: '{task}'. Studente: '{user_text}'. Dai feedback breve."
+    prompt = f"Sei un tutor. Compito in {language}: '{task}'. Studente: '{user_text}'. Dai feedback breve: correzione e consiglio."
     try:
         return model.generate_content(prompt).text
     except:
@@ -127,11 +126,12 @@ if 'quiz_submitted' not in st.session_state: st.session_state.quiz_submitted = F
 if st.session_state.lesson is None:
     c1, c2 = st.columns(2)
     with c1:
-        lang = st.selectbox("Lingua", ["Inglese", "Spagnolo", "Francese", "Tedesco"])
-        level = st.select_slider("Livello", ["A1", "A2", "B1", "B2"])
+        # ECCO L'ITALIANO AGGIUNTO QUI SOTTO
+        lang = st.selectbox("Lingua", ["Inglese", "Spagnolo", "Francese", "Tedesco", "Italiano"])
+        level = st.select_slider("Livello", ["A1", "A2", "B1", "B2", "C1"])
     with c2:
-        grammar = st.text_input("Grammatica", placeholder="es. Present Perfect")
-        topic = st.text_input("Passione", placeholder="es. Calcio")
+        grammar = st.text_input("Grammatica", placeholder="es. Passato Prossimo")
+        topic = st.text_input("Passione", placeholder="es. Cucina")
 
     if st.button("Genera Lezione", type="primary"):
         if grammar and topic:
